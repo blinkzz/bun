@@ -21180,37 +21180,36 @@ fn NewParser_(
                         }
 
                         if (prop.kind != .class_static_block and !prop.flags.contains(.is_method) and prop.key.?.data != .e_private_identifier and prop.ts_decorators.len > 0) {
-                            if (prop.initializer) |initializer_value| {
-                                var target: Expr = undefined;
+                            const initializer = if (prop.initializer) |initializer_value| initializer_value else p.newExpr(E.Undefined{}, prop.key.?.loc);
 
-                                if (prop.flags.contains(.is_static)) {
-                                    p.recordUsage(class.class_name.?.ref.?);
-                                    target = p.newExpr(E.Identifier{ .ref = class.class_name.?.ref.? }, class.class_name.?.loc);
-                                } else {
-                                    target = p.newExpr(E.This{}, prop.key.?.loc);
-                                }
-
-                                if (prop.flags.contains(.is_computed) or prop.key.?.data == .e_number) {
-                                    target = p.newExpr(E.Index{
-                                        .target = target,
-                                        .index = prop.key.?,
-                                    }, prop.key.?.loc);
-                                } else {
-                                    target = p.newExpr(E.Dot{
-                                        .target = target,
-                                        .name = prop.key.?.data.e_string.data,
-                                        .name_loc = prop.key.?.loc,
-                                    }, prop.key.?.loc);
-                                }
-
-                                if (prop.flags.contains(.is_static)) {
-                                    static_members.append(Stmt.assign(target, initializer_value)) catch unreachable;
-                                } else {
-                                    instance_members.append(Stmt.assign(target, initializer_value)) catch unreachable;
-                                }
-
-                                continue;
+                            var target: Expr = undefined;
+                            if (prop.flags.contains(.is_static)) {
+                                p.recordUsage(class.class_name.?.ref.?);
+                                target = p.newExpr(E.Identifier{ .ref = class.class_name.?.ref.? }, class.class_name.?.loc);
+                            } else {
+                                target = p.newExpr(E.This{}, prop.key.?.loc);
                             }
+
+                            if (prop.flags.contains(.is_computed) or prop.key.?.data == .e_number) {
+                                target = p.newExpr(E.Index{
+                                    .target = target,
+                                    .index = prop.key.?,
+                                }, prop.key.?.loc);
+                            } else {
+                                target = p.newExpr(E.Dot{
+                                    .target = target,
+                                    .name = prop.key.?.data.e_string.data,
+                                    .name_loc = prop.key.?.loc,
+                                }, prop.key.?.loc);
+                            }
+
+                            // remove fields with decorators from class body. Move static members outside of class.
+                            if (prop.flags.contains(.is_static)) {
+                                static_members.append(Stmt.assign(target, initializer)) catch unreachable;
+                            } else {
+                                instance_members.append(Stmt.assign(target, initializer)) catch unreachable;
+                            }
+                            continue;
                         }
 
                         class_properties.append(prop.*) catch unreachable;
